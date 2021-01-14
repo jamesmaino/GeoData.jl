@@ -39,6 +39,9 @@ shiftindexloci(::IndexMode, ::Locus, dim::Dimension) = dim
 shiftindexloci(mode::AbstractSampled, locus::Locus, dim::Dimension) =
     shiftindexloci(span(mode), sampling(mode), locus, dim)
 shiftindexloci(span::Span, sampling::Sampling, ::Locus, dim::Dimension) = dim
+shiftindexloci(span::Explicit, sampling::Intervals, ::Start, dim::Dimension) = rebuild(dim, val(span)[1, :])
+shiftindexloci(span::Explicit, sampling::Intervals, ::End, dim::Dimension) = rebuild(dim, val(span)[2, :])
+shiftindexloci(span::Explicit, sampling::Intervals, ::Center, dim::Dimension) = dim  
 shiftindexloci(span::Regular, sampling::Intervals, destlocus::Locus, dim::Dimension) =
     rebuild(dim, val(dim) .+ (abs(step(span)) * _offset(locus(sampling), destlocus)))
 

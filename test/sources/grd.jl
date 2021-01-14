@@ -1,5 +1,5 @@
 using GeoData, Test, Statistics, Dates, Plots, NCDatasets, ArchGDAL
-using GeoData: name, mode, window, DiskStack
+using GeoData: name, mode, window, DiskStack, bounds
 testpath = joinpath(dirname(pathof(GeoData)), "../test/")
 include(joinpath(testpath, "test_utils.jl"))
 

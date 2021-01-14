@@ -346,20 +346,16 @@ function _gdalsetproperties!(dataset, A)
     # This allows saving NetCDF to Tiff
     # Set the index loci to the start of the cell for the lat and lon dimensions.
     # NetCDF or other formats use the center of the interval, so they need conversion.
-    lon = shiftindexloci(GDAL_LON_LOCUS, dims(A, Lon))
-    lat = shiftindexloci(GDAL_LAT_LOCUS, dims(A, Lat))
-    lon = convertmode(Projected, lon)
-    lat = convertmode(Projected, lat)
+    lon = convertmode(Projected, shiftindexloci(GDAL_LON_LOCUS, dims(A, Lon)))
+    lat = convertmode(Projected, shiftindexloci(GDAL_LAT_LOCUS, dims(A, Lat)))
     @assert indexorder(lat) == GDAL_LAT_INDEX
     @assert indexorder(lon) == GDAL_LON_INDEX
-    # Get the geotransform from the updated lat/lon dims
-    geotransform = _dims2geotransform(lat, lon)
-    # Convert projection to a string of well known text
-    proj = convert(String, convert(WellKnownText, crs(lon)))
-
-    # Write projection, geotransform and data to GDAL
-    AG.setproj!(dataset, proj)
-    AG.setgeotransform!(dataset, geotransform)
+    # Convert crs to WKT if it exists
+    if !(crs(lon) isa Nothing)
+        AG.setproj!(dataset, convert(String, convert(WellKnownText, crs(lon))))
+    end
+    # Get the geotransform from the updated lat/lon dims and write
+    AG.setgeotransform!(dataset, _dims2geotransform(lat, lon))
 
     # Set the nodata value. GDAL can't handle missing
     # We could choose a default, but we would need to do this for all

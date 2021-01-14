@@ -1,5 +1,5 @@
 using NCDatasets, ArchGDAL, GeoData, Test, Statistics, Dates, CFTime, Plots, GeoFormatTypes
-using GeoData: name, window, mode, span, sampling, val, Ordered
+using GeoData: name, window, mode, span, sampling, val, Ordered, bounds
 include(joinpath(dirname(pathof(GeoData)), "../test/test_utils.jl"))
 
 ncexamples = "https://www.unidata.ucar.edu/software/netcdf/examples/"
@@ -24,15 +24,9 @@ stackkeys = (
     :xl, :xlvi
 )
 
+
 @testset "NCDarray" begin
     ncarray = NCDarray(ncsingle)
-    val(span(ncarray, Lat))
-    index(ncarray, Lat)
-    nc2 = ncarray[Lat(1:10)]
-    val(span(nc2, Lat))
-    val(span(reverse(nc2; dims=Lat), Lat))
-    val(span(nc2, Ti))
-    ds = NCDataset(ncsingle)
 
     @testset "open" begin
         @test all(open(A -> A[Lat=1], ncarray) .=== ncarray[:, 1, :])
@@ -44,12 +38,11 @@ stackkeys = (
         @test val(dims(ncarray, Ti())) == DateTime360Day(2001, 1, 16):Month(1):DateTime360Day(2002, 12, 16)
         @test val(dims(ncarray, Lat())) == -79.5:89.5
         @test val(dims(ncarray, Lon())) == 1.0:2:359.0
-        @test_broken bounds(ncarray) == (
+        @test_broken DimensionalData.bounds(ncarray) == (
             (0.0, 360.0), 
             (-80.0, 90.0), 
             (DateTime360Day(2001, 1, 16), DateTime360Day(2002, 12, 16)),
         )
-
     end
 
     @testset "dimensions" begin
@@ -95,19 +88,20 @@ stackkeys = (
         end
     end
 
-    # @testset "selectors" begin
-    #     a = ncarray[Lon(At(21.0)), Lat(Between(50, 52)), Ti(Near(DateTime360Day(2002, 12)))];
-    #     @test bounds(a) == ((50.0, 52.0),)
-    #     x = ncarray[Lon(Near(150)), Lat(Near(30)), Ti(1)]
-    #     @test x isa Float32
-    #     # TODO make sure we are getting the right cell.
-    #     @test size(ncarray[Lat(Between(-80, 90)), Lon(Between(0, 360)),
-    #         Ti(Between(DateTime360Day(2001, 1, 16), DateTime360Day(2003, 01, 16)))
-    #     ]) == (180, 170, 24)
-    #     nca = ncarray[Lat(Between(-80, -25)), Lon(Between(0, 180)), 
-    #                   Ti(Near(DateTime360Day(2002, 02, 20)))]
-    #     @test size(nca) == (90, 55)
-    # end
+    @testset "selectors" begin
+        a = ncarray[Lon(At(21.0)), Lat(Between(50, 52)), Ti(Near(DateTime360Day(2002, 12)))];
+        @test bounds(a) == ((50.0, 52.0),)
+        x = ncarray[Lon(Near(150)), Lat(Near(30)), Ti(1)]
+        @test x isa Float32
+        dimz = Lon(Between(0.0, 360)), Lat(Between(-80, 90)), 
+               Ti(Between(DateTime360Day(2001, 1, 1), DateTime360Day(2003, 01, 02)))
+        @test size(ncarray[dimz...]) == (180, 170, 24)
+        @test index(ncarray[dimz...]) == index(ncarray)
+        nca = ncarray[Lat(Between(-80, -25)), Lon(Between(0, 180)), Ti(Contains(DateTime360Day(2002, 02, 20)))]
+        @test size(nca) == (90, 55)
+        @test index(nca, Lat) == index(ncarray[1:90, 1:55, 2], Lat)
+        @test all(nca .=== ncarray[1:90, 1:55, 14])
+    end
 
     @testset "conversion to GeoArray" begin
         geoarray = ncarray[Lon(1:50), Lat(20:20), Ti(1)]
@@ -125,7 +119,7 @@ stackkeys = (
         @testset "to netcdf" begin
             # TODO save and load subset
             geoarray = GeoArray(ncarray)
-            metadata(geoarray)
+            mappedcrs(geoarray)
             @test size(geoarray) == size(ncarray)
             filename = tempname()
             write(filename, NCDarray, geoarray)
@@ -133,10 +127,14 @@ stackkeys = (
             @test size(saved) == size(geoarray)
             @test refdims(saved) == refdims(geoarray)
             @test missingval(saved) === missingval(geoarray)
-            @test_broken metadata(saved) == metadata(geoarray)
-            @test_broken all(metadata.(dims(saved)) .== metadata.(dims(geoarray)))
+            @test_broken map(metadata.(dims(saved)), metadata.(dims(geoarray))) do s, g
+                all(s .== g)
+            end |> all
             @test GeoData.name(saved) == GeoData.name(geoarray)
-            @test all(mode.(dims(saved)) .== mode.(dims(geoarray)))
+            @test all(order.(dims(saved)) .== order.(dims(geoarray)))
+            @test all(typeof.(span.(dims(saved))) .== typeof.(span.(dims(geoarray))))
+            @test all(val.(span.(dims(saved))) .== val.(span.(dims(geoarray))))
+            @test all(sampling.(dims(saved)) .== sampling.(dims(geoarray)))
             @test typeof(dims(saved)) <: typeof(dims(geoarray))
             @test val(dims(saved)[3]) == val(dims(geoarray)[3])
             @test all(val.(dims(saved)) .== val.(dims(geoarray)))
@@ -266,11 +264,7 @@ end
     end
 
     @testset "save" begin
-        metadata(ncstack)
         geostack = GeoStack(ncstack);
-        metadata(geostack)
-        length(dims(geostack[:aclcac]))
-        ndims(geostack[:aclcac])
         filename = tempname()
         write(filename, NCDstack, geostack);
         saved = GeoStack(NCDstack(filename))
