@@ -6,7 +6,7 @@ const GeoDim = Union{GeoXDim,GeoYDim,GeoZDim}
 # We only look at arrays with GeoDims here.
 # Otherwise they fall back to DimensionalData.jl recipes
 @recipe function f(A::AbstractGeoArray)
-    ddplot(A) = A |> a -> DimArray(a; dims=_maybe_mapped(dims(a)))
+    ddplot(A) = DimArray(A; dims=_maybe_mapped(dims(A)))
 
     A = GeoArray(A)
     if !(get(plotattributes, :seriestype, :none) in (:none, :heatmap))

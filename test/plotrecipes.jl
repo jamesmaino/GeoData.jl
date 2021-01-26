@@ -1,6 +1,6 @@
 using GeoData, Test, Dates, Plots
 
-ga2 = GeoArray(rand(41, 91), (Lat(-20.0:1.0:20.0), Lon(0.0:4.0:360.0)); name=:Test)
+ga2 = GeoArray(ones(91) * (-25:15)', (Lon(0.0:4.0:360.0), Lat(-25.0:1.0:15.0), ); name=:Test)
 ga3 = GeoArray(rand(10, 41, 91), (Vert(100:100:1000), Lat(-20.0:1.0:20.0), Lon(0.0:4.0:360.0)))
 ga4ti = GeoArray(
     rand(10, 41, 91, 4), 
